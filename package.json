@@ -1,8 +1,8 @@
 {
   "name": "dsh-style-wallpaper",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
-  "description": "Customize the DSH top-left name and logo, and use an image as the window wallpaper.",
+  "description": "Customize the DSH top-left name, subtitle, text styles and logo, and use an image as the window wallpaper.",
   "license": "MIT",
   "keywords": [
     "dsh",

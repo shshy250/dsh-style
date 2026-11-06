@@ -40,6 +40,12 @@ window.__ModuleLoader__.load({
       'name.placeholder': '输入名称',
       'name.save': '应用',
       'name.reset': '恢复默认',
+      'subtitle.label': '副标题',
+      'subtitle.hint': '显示在主标题后面，留空则隐藏。最多 40 个字符。',
+      'subtitle.placeholder': '输入副标题',
+      'text.color': '颜色',
+      'text.size': '字号',
+      'text.preview': '预览',
       'logo.label': '应用图标',
       'logo.hint': '显示在名称左侧，建议使用正方形。支持 PNG、JPG、WebP、GIF、SVG。',
       'logo.upload': '上传图标',
@@ -70,6 +76,12 @@ window.__ModuleLoader__.load({
       'name.placeholder': 'Enter a name',
       'name.save': 'Apply',
       'name.reset': 'Restore default',
+      'subtitle.label': 'Subtitle',
+      'subtitle.hint': 'Shown after the main title. Leave empty to hide it; up to 40 characters.',
+      'subtitle.placeholder': 'Enter a subtitle',
+      'text.color': 'Color',
+      'text.size': 'Font size',
+      'text.preview': 'Preview',
       'logo.label': 'App icon',
       'logo.hint': 'Shown left of the name; a square image works best. PNG, JPG, WebP, GIF, and SVG are supported.',
       'logo.upload': 'Upload icon',
@@ -279,7 +291,7 @@ window.__ModuleLoader__.load({
 
       const syncBrand = () => {
         const wantsLogo = typeof snapshot?.logo?.url === 'string' && snapshot.logo.url !== '';
-        const wantsName = typeof snapshot?.name === 'string' && snapshot.name.trim() !== '';
+        const wantsName = (typeof snapshot?.name === 'string' && snapshot.name.trim() !== '') || (typeof snapshot?.subtitle === 'string' && snapshot.subtitle.trim() !== '');
         markHandle = syncRegistration(ctx, markHandle, wantsLogo, 'sidebar.brand.mark', BrandMark);
         nameHandle = syncRegistration(ctx, nameHandle, wantsName, 'sidebar.brand.name', BrandName);
       };
@@ -374,25 +386,23 @@ window.__ModuleLoader__.load({
       function BrandName() {
         useRevision();
         const name = typeof snapshot?.name === 'string' ? snapshot.name.trim() : '';
-        if (name === '') return null;
+        const subtitle = typeof snapshot?.subtitle === 'string' ? snapshot.subtitle.trim() : '';
+        if (name === '' && subtitle === '') return null;
+        const titleStyle = {
+          display: 'block', minWidth: 0, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          fontSize: `${snapshot?.nameSize ?? 14}px`, fontWeight: 600, lineHeight: 1.2,
+          color: snapshot?.nameColor ?? '#e7e9ed',
+        };
+        const subtitleStyle = {
+          display: 'block', minWidth: 0, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          fontSize: `${snapshot?.subtitleSize ?? 11}px`, fontWeight: 400, lineHeight: 1.2,
+          color: snapshot?.subtitleColor ?? '#aeb4c0',
+        };
         return h(
           'span',
-          {
-            title: name,
-            style: {
-              display: 'block',
-              maxWidth: '100%',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-              fontSize: '14px',
-              fontWeight: 600,
-              letterSpacing: '0.2px',
-              lineHeight: 1.2,
-              color: 'var(--dsw-alias-label-primary)',
-            },
-          },
-          name,
+          { title: [name, subtitle].filter(Boolean).join(' · '), style: { display: 'flex', alignItems: 'baseline', gap: '6px', minWidth: 0, maxWidth: '100%' } },
+          name === '' ? null : h('span', { style: titleStyle }, name),
+          subtitle === '' ? null : h('span', { style: subtitleStyle }, subtitle),
         );
       }
 
@@ -427,20 +437,26 @@ window.__ModuleLoader__.load({
         const data = snapshot;
         const failed = loadFailed;
         const [nameDraft, setNameDraft] = React.useState(null);
-        const [dimDraft, setDimDraft] = React.useState(null);
+        const [subtitleDraft, setSubtitleDraft] = React.useState(null);
         const [busy, setBusy] = React.useState(false);
         const [notice, setNotice] = React.useState(null);
-        const dimTimer = React.useRef(null);
+        const optionsTimer = React.useRef(null);
+        const pendingOptions = React.useRef({});
 
         React.useEffect(
           () => () => {
-            if (dimTimer.current !== null) clearTimeout(dimTimer.current);
+            if (optionsTimer.current !== null) clearTimeout(optionsTimer.current);
           },
           [],
         );
 
         const name = nameDraft ?? (typeof data?.name === 'string' ? data.name : '');
-        const dim = dimDraft ?? (typeof data?.dim === 'number' ? data.dim : 0.25);
+        const subtitle = subtitleDraft ?? (typeof data?.subtitle === 'string' ? data.subtitle : '');
+        const dim = typeof data?.dim === 'number' ? data.dim : 0.25;
+        const nameColor = data?.nameColor ?? '#e7e9ed';
+        const subtitleColor = data?.subtitleColor ?? '#aeb4c0';
+        const nameSize = data?.nameSize ?? 14;
+        const subtitleSize = data?.subtitleSize ?? 11;
 
         const run = async (operation) => {
           setBusy(true);
@@ -469,30 +485,36 @@ window.__ModuleLoader__.load({
             }
           });
 
-        const putDim = async (value) => {
+        const changeOption = (key, value) => {
+          if (snapshot === null) return;
+          snapshot = { ...snapshot, [key]: value };
+          pendingOptions.current[key] = value;
+          bump();
+          if (optionsTimer.current !== null) clearTimeout(optionsTimer.current);
+          optionsTimer.current = setTimeout(async () => {
+            optionsTimer.current = null;
+            const options = pendingOptions.current;
+            pendingOptions.current = {};
+            const payload = await call('/options', {
+              method: 'PUT',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify(options),
+            });
+            if (payload?.ok !== true) setNotice({ kind: 'error', text: messageFor(payload?.error, t) });
+          }, 300);
+        };
+
+        const saveSubtitle = (next) => run(async () => {
           const payload = await call('/options', {
             method: 'PUT',
             headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ dim: value }),
+            body: JSON.stringify({ subtitle: next }),
           });
-          if (payload?.ok !== true) {
-            setNotice({ kind: 'error', text: messageFor(payload?.error, t) });
-          }
-        };
-
-        const changeDim = (value) => {
-          setDimDraft(value);
-          if (snapshot !== null) {
-            /* Paint immediately; the Host write is debounced behind the drag. */
-            snapshot = { ...snapshot, dim: value };
-            bump();
-          }
-          if (dimTimer.current !== null) clearTimeout(dimTimer.current);
-          dimTimer.current = setTimeout(() => {
-            dimTimer.current = null;
-            void putDim(value);
-          }, 350);
-        };
+          if (payload?.ok === true) {
+            setSubtitleDraft(null);
+            setNotice({ kind: 'ok', text: t('saved') });
+          } else setNotice({ kind: 'error', text: messageFor(payload?.error, t) });
+        });
 
         const upload = async (kind, file) => {
           if (file === undefined || file === null) return;
@@ -589,6 +611,31 @@ window.__ModuleLoader__.load({
               ),
               h('span', { className: 'dsh-style-hint' }, t('name.hint')),
             ),
+            h('div', { className: 'dsh-style-field' },
+              h('span', { className: 'dsh-style-label' }, t('subtitle.label')),
+              h('div', { className: 'dsh-style-actions' },
+                h('input', { className: 'dsh-style-input', type: 'text', value: subtitle, maxLength: 40, placeholder: t('subtitle.placeholder'), disabled: busy, onChange: (event) => setSubtitleDraft(event.target.value), onKeyDown: (event) => { if (event.key === 'Enter') void saveSubtitle(subtitle.trim()); } }),
+                h('button', { type: 'button', className: 'dsh-style-btn dsh-style-accent', disabled: busy, onClick: () => void saveSubtitle(subtitle.trim()) }, t('name.save')),
+                h('button', { type: 'button', className: 'dsh-style-btn', disabled: busy || (data.subtitle === '' && subtitle === ''), onClick: () => void saveSubtitle('') }, t('name.reset')),
+              ),
+              h('span', { className: 'dsh-style-hint' }, t('subtitle.hint')),
+            ),
+            h('div', { className: 'dsh-style-field' },
+              h('span', { className: 'dsh-style-label' }, t('name.label'), ' · ', t('text.preview')),
+              h('div', { className: 'dsh-style-preview' }, h('span', { style: { color: nameColor, fontSize: `${nameSize}px` } }, name || t('name.label'))),
+              h('div', { className: 'dsh-style-actions' },
+                h('label', { className: 'dsh-style-control-label' }, t('text.color'), h('input', { type: 'color', value: nameColor, onChange: (event) => changeOption('nameColor', event.target.value) })),
+                h('label', { className: 'dsh-style-control-label' }, t('text.size'), h('input', { className: 'dsh-style-range', type: 'range', min: 10, max: 24, step: 1, value: nameSize, onChange: (event) => changeOption('nameSize', Number(event.target.value)) }), h('span', null, `${nameSize}px`)),
+              ),
+            ),
+            h('div', { className: 'dsh-style-field' },
+              h('span', { className: 'dsh-style-label' }, t('subtitle.label'), ' · ', t('text.preview')),
+              h('div', { className: 'dsh-style-preview' }, h('span', { style: { color: subtitleColor, fontSize: `${subtitleSize}px` } }, subtitle || t('subtitle.label'))),
+              h('div', { className: 'dsh-style-actions' },
+                h('label', { className: 'dsh-style-control-label' }, t('text.color'), h('input', { type: 'color', value: subtitleColor, onChange: (event) => changeOption('subtitleColor', event.target.value) })),
+                h('label', { className: 'dsh-style-control-label' }, t('text.size'), h('input', { className: 'dsh-style-range', type: 'range', min: 8, max: 20, step: 1, value: subtitleSize, onChange: (event) => changeOption('subtitleSize', Number(event.target.value)) }), h('span', null, `${subtitleSize}px`)),
+              ),
+            ),
             h(
               'div',
               { className: 'dsh-style-field' },
@@ -669,7 +716,7 @@ window.__ModuleLoader__.load({
                 step: 0.05,
                 value: dim,
                 disabled: busy,
-                onChange: (event) => changeDim(Number(event.target.value)),
+                onChange: (event) => changeOption('dim', Number(event.target.value)),
               }),
               h('span', { className: 'dsh-style-hint' }, t('background.dimHint')),
             ),
@@ -726,6 +773,9 @@ window.__ModuleLoader__.load({
       '.dsh-style-label{font-size:13px;font-weight:500;color:var(--dsw-alias-label-primary)}',
       '.dsh-style-hint{font-size:12px;line-height:1.55;color:var(--dsw-alias-label-secondary)}',
       '.dsh-style-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}',
+      '.dsh-style-control-label{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--dsw-alias-label-secondary)}',
+      '.dsh-style-control-label input[type=color]{width:36px;height:28px;padding:2px;border:1px solid var(--dsw-alias-border-l2);border-radius:6px;background:transparent;cursor:pointer}',
+      '.dsh-style-preview{min-height:40px;display:flex;align-items:center;padding:8px 12px;border:1px solid var(--dsw-alias-border-l1);border-radius:6px;background:var(--dsw-alias-bg-layer-2)}',
       '.dsh-style-input{height:32px;min-width:220px;padding:0 10px;border-radius:8px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);font-size:13px;outline:none}',
       '.dsh-style-input:focus{border-color:var(--dsw-alias-brand-primary)}',
       '.dsh-style-input::placeholder{color:var(--dsw-alias-label-secondary)}',

@@ -133,10 +133,10 @@ function createStore(ctx) {
         return project(await persist({ ...current, name }));
       });
     },
-    async setDim(dim) {
+    async setOptions(options) {
       return serialize(async () => {
         const current = await load();
-        return project(await persist({ ...current, dim }));
+        return project(await persist({ ...current, ...options }));
       });
     },
     async putMedia(kind, bytes) {
@@ -223,12 +223,12 @@ async function handleRequest(store, req, res) {
     }
     if (rest === 'options' && method === 'PUT') {
       const body = await readJson(req);
-      if (typeof body?.dim !== 'number' || !Number.isFinite(body.dim)) {
+      const options = normalizeOptions(body);
+      if (options === null) {
         sendJson(res, 400, { ok: false, error: 'bad-request' });
         return;
       }
-      const dim = Math.min(MAX_DIM, Math.max(0, body.dim));
-      sendJson(res, 200, { ok: true, state: await store.setDim(dim) });
+      sendJson(res, 200, { ok: true, state: await store.setOptions(options) });
       return;
     }
     if (rest === 'media' && method === 'POST') {
@@ -292,7 +292,31 @@ function dataDirectory() {
 
 /** @returns a fresh default state object. */
 function defaultState() {
-  return { version: 1, name: '', dim: DEFAULT_DIM, logo: null, background: null };
+  return {
+    version: 1,
+    name: '',
+    subtitle: '',
+    nameColor: '#e7e9ed',
+    subtitleColor: '#aeb4c0',
+    nameSize: 14,
+    subtitleSize: 11,
+    dim: DEFAULT_DIM,
+    logo: null,
+    background: null,
+  };
+}
+
+const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
+function normalizeOptions(raw) {
+  if (raw === null || typeof raw !== 'object') return null;
+  const next = {};
+  if (typeof raw.dim === 'number' && Number.isFinite(raw.dim)) next.dim = Math.min(MAX_DIM, Math.max(0, raw.dim));
+  if (typeof raw.subtitle === 'string') next.subtitle = raw.subtitle.trim().slice(0, 40);
+  if (typeof raw.nameColor === 'string' && HEX_COLOR.test(raw.nameColor)) next.nameColor = raw.nameColor.toLowerCase();
+  if (typeof raw.subtitleColor === 'string' && HEX_COLOR.test(raw.subtitleColor)) next.subtitleColor = raw.subtitleColor.toLowerCase();
+  if (typeof raw.nameSize === 'number' && Number.isFinite(raw.nameSize)) next.nameSize = Math.min(24, Math.max(10, raw.nameSize));
+  if (typeof raw.subtitleSize === 'number' && Number.isFinite(raw.subtitleSize)) next.subtitleSize = Math.min(20, Math.max(8, raw.subtitleSize));
+  return Object.keys(next).length > 0 ? next : null;
 }
 
 /**
@@ -306,6 +330,11 @@ function normalizeState(raw) {
   if (raw === null || typeof raw !== 'object') return next;
   if (typeof raw.name === 'string') next.name = raw.name.trim().slice(0, 40);
   if (typeof raw.dim === 'number' && Number.isFinite(raw.dim)) next.dim = Math.min(MAX_DIM, Math.max(0, raw.dim));
+  if (typeof raw.subtitle === 'string') next.subtitle = raw.subtitle.trim().slice(0, 40);
+  if (typeof raw.nameColor === 'string' && HEX_COLOR.test(raw.nameColor)) next.nameColor = raw.nameColor.toLowerCase();
+  if (typeof raw.subtitleColor === 'string' && HEX_COLOR.test(raw.subtitleColor)) next.subtitleColor = raw.subtitleColor.toLowerCase();
+  if (typeof raw.nameSize === 'number' && Number.isFinite(raw.nameSize)) next.nameSize = Math.min(24, Math.max(10, raw.nameSize));
+  if (typeof raw.subtitleSize === 'number' && Number.isFinite(raw.subtitleSize)) next.subtitleSize = Math.min(20, Math.max(8, raw.subtitleSize));
   next.logo = normalizeAsset(raw.logo);
   next.background = normalizeAsset(raw.background);
   return next;
@@ -338,6 +367,11 @@ function normalizeAsset(raw) {
 function project(state) {
   return {
     name: state.name,
+    subtitle: state.subtitle,
+    nameColor: state.nameColor,
+    subtitleColor: state.subtitleColor,
+    nameSize: state.nameSize,
+    subtitleSize: state.subtitleSize,
     dim: state.dim,
     logo: state.logo === null ? null : { ...state.logo, url: `${PREFIX}/asset/${state.logo.file}` },
     background:
