@@ -17,7 +17,7 @@
  * Harness storages, so it survives plugin upgrades and page reloads without
  * bloating the profile patch.
  *
- * @module @local/dsh-style
+ * @module dsh-style-wallpaper
  */
 import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
@@ -28,7 +28,7 @@ import path from 'node:path';
 /** Route prefix owned by this bundle. */
 const PREFIX = '/dsh-style';
 /** Plugin id used for log lines and effect labels. */
-const PLUGIN_ID = '@local/dsh-style';
+const PLUGIN_ID = 'dsh-style-wallpaper';
 /** Stored media kinds and their size ceilings. */
 const KINDS = ['logo', 'background'];
 const LIMITS = { logo: 2 * 1024 * 1024, background: 32 * 1024 * 1024 };

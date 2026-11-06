@@ -12,10 +12,10 @@
  * All state comes from the Host route owned by `index.js`; the settings page
  * writes through the same route.
  *
- * @module @local/dsh-style/client
+ * @module dsh-style-wallpaper/client
  */
 window.__ModuleLoader__.load({
-  id: '@local/dsh-style',
+  id: 'dsh-style-wallpaper',
   factory(require) {
     const React = require('react');
     const h = React.createElement;
@@ -262,7 +262,7 @@ window.__ModuleLoader__.load({
             tokenDispose();
             tokenDispose = null;
           }
-          if (wanted) tokenDispose = ctx.theme.overrideTokens('@local/dsh-style', WALLPAPER_TOKENS);
+          if (wanted) tokenDispose = ctx.theme.overrideTokens('dsh-style-wallpaper', WALLPAPER_TOKENS);
         };
         const off = subscribe(paint);
         paint();
@@ -297,15 +297,8 @@ window.__ModuleLoader__.load({
       }, 'dsh-style: brand slots');
 
       /* ---- the settings page ---- */
-      ctx.slots.inject('settings.section', () =>
-        ctx.slots.register(
-          { name: 'settings.section', id: 'dsh-style', order: 25, label: () => t('section.title') },
-          SettingsPage,
-        ),
-      );
-      ctx.slots.inject('settings.section.icon', () =>
-        ctx.slots.register({ name: 'settings.section.icon', id: 'dsh-style', order: 25 }, SettingsIcon),
-      );
+      safeInject(ctx, 'settings.section', { name: 'settings.section', id: 'dsh-style', order: 25, label: () => t('section.title') }, SettingsPage);
+      safeInject(ctx, 'settings.section.icon', { name: 'settings.section.icon', id: 'dsh-style', order: 25 }, SettingsIcon);
 
       void refresh();
 
@@ -336,6 +329,25 @@ window.__ModuleLoader__.load({
           return null;
         }
         return handle;
+      }
+
+      /**
+       * Register an always-on occupant, tolerating a cell another live copy of
+       * this plugin still holds (a page refresh clears the duplicate).
+       *
+       * @param ctxRef - client context.
+       * @param key - slot key.
+       * @param options - registration options.
+       * @param Component - occupant component.
+       * @returns the injection handle, or null when the cell was taken.
+       */
+      function safeInject(ctxRef, key, options, Component) {
+        try {
+          return ctxRef.slots.inject(key, () => ctxRef.slots.register(options, Component));
+        } catch (error) {
+          console.error(`[dsh-style] could not register '${key}'`, error);
+          return null;
+        }
       }
 
       function BrandMark(props) {

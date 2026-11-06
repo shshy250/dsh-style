@@ -1,10 +1,29 @@
 {
-  "name": "@local/dsh-style",
+  "name": "dsh-style-wallpaper",
   "version": "1.0.0",
-  "private": true,
   "type": "module",
   "description": "Customize the DSH top-left name and logo, and use an image as the window wallpaper.",
   "license": "MIT",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "cordis-plugin",
+    "wallpaper",
+    "branding",
+    "theme"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shshy250/dsh-style.git"
+  },
+  "homepage": "https://github.com/shshy250/dsh-style#readme",
+  "bugs": {
+    "url": "https://github.com/shshy250/dsh-style/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "exports": {
     ".": "./index.js",
     "./client": "./client.js",
@@ -17,7 +36,8 @@
     "cordis.patch.yml",
     "locale/*.json",
     "icon.svg",
-    "LICENSE"
+    "LICENSE",
+    "README.md"
   ],
   "dsh": {
     "bundle": {
